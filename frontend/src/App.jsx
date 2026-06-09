@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import './App.css'
 
-const API = 'http://192.168.1.105:3000'
+const API = 'http://localhost:3000'
 
 function App() {
   const [vista, setVista] = useState('catalogo')
