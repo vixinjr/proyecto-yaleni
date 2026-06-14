@@ -5,7 +5,7 @@ const API = 'http://localhost:3000'
 
 function App() {
   const [vista, setVista] = useState('catalogo')
-  const [rol, setRol] = useState(null)
+  const [usuario, setUsuario] = useState(null)
   const [toasts, setToasts] = useState([])
 
   const addToast = (message, type = 'success') => {
@@ -14,6 +14,12 @@ function App() {
     setTimeout(() => {
       setToasts(prev => prev.filter(toast => toast.id !== id))
     }, 3000)
+  }
+
+  const cerrarSesion = () => {
+    setUsuario(null)
+    setVista('catalogo')
+    addToast('Sesion cerrada', 'success')
   }
 
   return (
@@ -31,22 +37,38 @@ function App() {
             >
               📦 Catálogo
             </button>
-            <button 
-              className="btn-nav btn-login"
-              onClick={() => { 
-                setVista('login')
-                setRol(null)
-              }}
-            >
-              {rol ? `👋 Hola, ${rol}` : '🔑 Acceder'}
-            </button>
+
+            {usuario && usuario.rol === 'emprendedor' && (
+              <button 
+                className="btn-nav btn-catalogo"
+                onClick={() => setVista('emprendedor')}
+              >
+                🏪 Mi Panel
+              </button>
+            )}
+
+            {usuario ? (
+              <button 
+                className="btn-nav btn-login"
+                onClick={cerrarSesion}
+              >
+                👋 {usuario.nombre} (Salir)
+              </button>
+            ) : (
+              <button 
+                className="btn-nav btn-login"
+                onClick={() => setVista('login')}
+              >
+                🔑 Acceder
+              </button>
+            )}
           </div>
         </div>
       </header>
 
       <main className="main-content">
-        {vista === 'catalogo' && <Catalogo setVista={setVista} addToast={addToast} />}
-        {vista === 'login' && <Login setVista={setVista} setRol={setRol} addToast={addToast} />}
+        {vista === 'catalogo' && <Catalogo addToast={addToast} />}
+        {vista === 'login' && <Login setVista={setVista} setUsuario={setUsuario} addToast={addToast} />}
         {vista === 'emprendedor' && <PanelEmprendedor addToast={addToast} />}
       </main>
 
@@ -107,7 +129,11 @@ function Catalogo({ addToast }) {
           {productos.map(p => (
             <div key={p.id} className="product-card">
               <div className="product-image">
-                🛍️
+                {p.imagen ? (
+                  <img src={`${API}${p.imagen}`} alt={p.nombre} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                ) : (
+                  '🛍️'
+                )}
               </div>
               <div className="product-content">
                 <h3 className="product-title">{p.nombre}</h3>
@@ -123,9 +149,13 @@ function Catalogo({ addToast }) {
   )
 }
 
-function Login({ setVista, setRol, addToast }) {
+function Login({ setVista, setUsuario, addToast }) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [nombre, setNombre] = useState('')
+  const [nombreNegocio, setNombreNegocio] = useState('')
+  const [descripcionNegocio, setDescripcionNegocio] = useState('')
+  const [categoriaNegocio, setCategoriaNegocio] = useState('')
   const [loading, setLoading] = useState(false)
   const [modo, setModo] = useState('login')
 
@@ -145,7 +175,7 @@ function Login({ setVista, setRol, addToast }) {
       const data = await res.json()
       
       if (res.ok) {
-        setRol(data.usuario.nombre)
+        setUsuario(data.usuario)
         addToast(`¡Bienvenido ${data.usuario.nombre}!`, 'success')
         setVista(data.usuario.rol === 'emprendedor' ? 'emprendedor' : 'catalogo')
       } else {
@@ -159,8 +189,8 @@ function Login({ setVista, setRol, addToast }) {
   }
 
   const handleRegistro = async () => {
-    if (!email || !password) {
-      addToast('Por favor completa todos los campos', 'error')
+    if (!email || !password || !nombre || !nombreNegocio || !categoriaNegocio) {
+      addToast('Por favor completa todos los campos obligatorios', 'error')
       return
     }
 
@@ -170,10 +200,13 @@ function Login({ setVista, setRol, addToast }) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
-          nombre: email.split('@')[0], 
+          nombre, 
           email, 
           password, 
-          rol: 'emprendedor' 
+          rol: 'emprendedor',
+          nombreNegocio,
+          descripcionNegocio,
+          categoriaNegocio
         })
       })
       const data = await res.json()
@@ -183,6 +216,10 @@ function Login({ setVista, setRol, addToast }) {
         setModo('login')
         setEmail('')
         setPassword('')
+        setNombre('')
+        setNombreNegocio('')
+        setDescripcionNegocio('')
+        setCategoriaNegocio('')
       } else {
         addToast(data.mensaje || 'Error en el registro', 'error')
       }
@@ -214,6 +251,21 @@ function Login({ setVista, setRol, addToast }) {
         {modo === 'login' ? '🔐 Acceso Emprendedor' : '📝 Crear Cuenta'}
       </div>
 
+      {modo === 'registro' && (
+        <>
+          <div className="form-group">
+            <input
+              type="text"
+              className="form-input"
+              placeholder="👤 Tu nombre completo"
+              value={nombre}
+              onChange={e => setNombre(e.target.value)}
+              disabled={loading}
+            />
+          </div>
+        </>
+      )}
+
       <div className="form-group">
         <input
           type="email"
@@ -236,6 +288,44 @@ function Login({ setVista, setRol, addToast }) {
           onKeyPress={e => e.key === 'Enter' && (modo === 'login' ? handleLogin() : handleRegistro())}
         />
       </div>
+
+      {modo === 'registro' && (
+        <>
+          <div className="form-group">
+            <input
+              type="text"
+              className="form-input"
+              placeholder="🏪 Nombre de tu negocio o puesto"
+              value={nombreNegocio}
+              onChange={e => setNombreNegocio(e.target.value)}
+              disabled={loading}
+            />
+          </div>
+
+          <div className="form-group">
+            <input
+              type="text"
+              className="form-input"
+              placeholder="🏷️ Categoría (ropa, comida, artesanía, etc.)"
+              value={categoriaNegocio}
+              onChange={e => setCategoriaNegocio(e.target.value)}
+              disabled={loading}
+            />
+          </div>
+
+          <div className="form-group">
+            <textarea
+              className="form-input"
+              placeholder="📄 Cuenta brevemente de qué trata tu negocio"
+              value={descripcionNegocio}
+              onChange={e => setDescripcionNegocio(e.target.value)}
+              rows="3"
+              disabled={loading}
+              style={{ resize: 'vertical' }}
+            />
+          </div>
+        </>
+      )}
 
       <button 
         className="form-button"
@@ -270,6 +360,8 @@ function PanelEmprendedor({ addToast }) {
   const [descripcion, setDescripcion] = useState('')
   const [precio, setPrecio] = useState('')
   const [categoria, setCategoria] = useState('')
+  const [imagen, setImagen] = useState(null)
+  const [preview, setPreview] = useState(null)
   const [loading, setLoading] = useState(false)
   const [tab, setTab] = useState('agregar')
 
@@ -287,6 +379,14 @@ function PanelEmprendedor({ addToast }) {
     }
   }
 
+  const handleImagenChange = (e) => {
+    const file = e.target.files[0]
+    if (file) {
+      setImagen(file)
+      setPreview(URL.createObjectURL(file))
+    }
+  }
+
   const agregarProducto = async () => {
     if (!nombre || !descripcion || !precio || !categoria) {
       addToast('Por favor completa todos los campos', 'error')
@@ -295,15 +395,18 @@ function PanelEmprendedor({ addToast }) {
 
     setLoading(true)
     try {
+      const formData = new FormData()
+      formData.append('nombre', nombre)
+      formData.append('descripcion', descripcion)
+      formData.append('precio', precio)
+      formData.append('categoria', categoria)
+      if (imagen) {
+        formData.append('imagen', imagen)
+      }
+
       const res = await fetch(`${API}/api/productos`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          nombre, 
-          descripcion, 
-          precio: parseInt(precio), 
-          categoria 
-        })
+        body: formData
       })
       const data = await res.json()
       
@@ -313,6 +416,8 @@ function PanelEmprendedor({ addToast }) {
         setDescripcion('')
         setPrecio('')
         setCategoria('')
+        setImagen(null)
+        setPreview(null)
         await cargarProductos()
         setTab('misproductos')
       } else {
@@ -410,6 +515,26 @@ function PanelEmprendedor({ addToast }) {
                 style={{ resize: 'vertical' }}
               />
             </div>
+
+            <div className="form-group">
+              <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', color: 'var(--gray-600)' }}>
+                📷 Foto del producto
+              </label>
+              <input
+                className="form-input"
+                type="file"
+                accept="image/*"
+                onChange={handleImagenChange}
+                disabled={loading}
+              />
+              {preview && (
+                <img 
+                  src={preview} 
+                  alt="Vista previa" 
+                  style={{ marginTop: '0.5rem', maxWidth: '150px', borderRadius: 'var(--radius)', border: '1px solid var(--gray-300)' }} 
+                />
+              )}
+            </div>
           </div>
           
           <button 
@@ -445,7 +570,11 @@ function PanelEmprendedor({ addToast }) {
               {productos.map(p => (
                 <div key={p.id} className="product-card">
                   <div className="product-image">
-                    🛍️
+                    {p.imagen ? (
+                      <img src={`${API}${p.imagen}`} alt={p.nombre} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    ) : (
+                      '🛍️'
+                    )}
                   </div>
                   <div className="product-content">
                     <h3 className="product-title">{p.nombre}</h3>

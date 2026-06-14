@@ -1,5 +1,20 @@
 const express = require('express')
+const multer = require('multer')
+const path = require('path')
 const router = express.Router()
+
+// Configuracion de multer para guardar imagenes
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, 'uploads/')
+  },
+  filename: (req, file, cb) => {
+    const nombreUnico = Date.now() + '-' + Math.round(Math.random() * 1e9) + path.extname(file.originalname)
+    cb(null, nombreUnico)
+  }
+})
+
+const upload = multer({ storage })
 
 let productos = []
 
@@ -15,18 +30,27 @@ router.get('/:id', (req, res) => {
   res.json(producto)
 })
 
-// Agregar un producto (solo emprendedor)
-router.post('/', (req, res) => {
+// Agregar un producto (con imagen opcional)
+router.post('/', upload.single('imagen'), (req, res) => {
   const { nombre, descripcion, precio, categoria } = req.body
   const nuevo = {
     id: productos.length + 1,
     nombre,
     descripcion,
-    precio,
-    categoria
+    precio: parseInt(precio),
+    categoria,
+    imagen: req.file ? `/uploads/${req.file.filename}` : null
   }
   productos.push(nuevo)
   res.status(201).json({ mensaje: 'Producto agregado', producto: nuevo })
+})
+
+// Eliminar un producto
+router.delete('/:id', (req, res) => {
+  const index = productos.findIndex(p => p.id === parseInt(req.params.id))
+  if (index === -1) return res.status(404).json({ mensaje: 'Producto no encontrado' })
+  productos.splice(index, 1)
+  res.json({ mensaje: 'Producto eliminado' })
 })
 
 module.exports = router
